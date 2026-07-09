@@ -9,6 +9,6 @@ java {
     }
 }
 
-tasks.withType<JavaCompile>() {
+tasks.withType<JavaCompile> {
     options.release = 21
 }
