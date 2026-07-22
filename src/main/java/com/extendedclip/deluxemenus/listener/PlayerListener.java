@@ -93,10 +93,14 @@ public class PlayerListener extends Listener {
 
         if (Menu.isInMenu(player)) {
             Menu.closeMenu(plugin, player, false);
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                Menu.cleanInventory(plugin, player);
-                player.updateInventory();
-            }, 3L);
+            player.getScheduler().runDelayed(plugin,
+                (task) -> {
+                    Menu.cleanInventory(plugin, player);
+                    player.updateInventory();
+                },
+                null,
+                3L
+            );
         }
     }
 

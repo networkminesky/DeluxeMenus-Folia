@@ -4,8 +4,9 @@ import com.extendedclip.deluxemenus.DeluxeMenus;
 import com.extendedclip.deluxemenus.cache.SimpleCache;
 import com.extendedclip.deluxemenus.utils.DebugLevel;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 import net.Indyuce.mmoitems.MMOItems;
@@ -45,34 +46,40 @@ public class MMOItemsHook implements ItemHook, SimpleCache {
             return new ItemStack(Material.STONE, 1);
         }
 
-        ItemStack mmoItem = null;
-        try {
-            mmoItem = Bukkit.getScheduler().callSyncMethod(plugin, () -> {
+        final CompletableFuture<ItemStack> future = new CompletableFuture<>();
+
+        Bukkit.getGlobalRegionScheduler().execute(plugin, () -> {
+            try {
                 ItemStack item = MMOItems.plugin.getItem(itemType, splitArgs[1]);
 
                 if (item == null) {
-                    return new ItemStack(Material.STONE, 1);
+                    future.complete(new ItemStack(Material.STONE, 1));
+                    return;
                 }
 
                 cache.put(arguments[0], item);
+                future.complete(item.clone());
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.WARNING, "Erro ao obter item MMOItems: " + arguments[0], e);
+                future.complete(new ItemStack(Material.STONE, 1));
+            }
+        });
 
-                return item.clone();
-            }).get();
-        } catch (InterruptedException | ExecutionException e) {
-            plugin.debug(DebugLevel.HIGHEST, Level.SEVERE, "Error getting MMOItem synchronously.");
+        try {
+            return future.get(3, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "Timeout ou erro ao aguardar item MMOItems: " + arguments[0], e);
+            return new ItemStack(Material.STONE, 1);
         }
-
-        return mmoItem == null ? new ItemStack(Material.STONE, 1) : mmoItem;
     }
 
     @Override
     public boolean itemMatchesIdentifiers(@NotNull ItemStack item, @NotNull String... arguments) {
-        if (arguments.length == 0) {
-            return false;
-        }
+        if (arguments.length == 0) return false;
         String[] splitArgs = arguments[0].split(":", 2);
         if (splitArgs.length != 2) return false;
-        return splitArgs[0].equalsIgnoreCase(MMOItems.getTypeName(item)) && splitArgs[1].equalsIgnoreCase(MMOItems.getID(item));
+        return splitArgs[0].equalsIgnoreCase(MMOItems.getTypeName(item))
+            && splitArgs[1].equalsIgnoreCase(MMOItems.getID(item));
     }
 
     @Override

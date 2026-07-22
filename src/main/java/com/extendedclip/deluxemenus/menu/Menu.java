@@ -200,7 +200,7 @@ public class Menu {
         }
 
         if (close) {
-            Bukkit.getScheduler().runTask(plugin, () -> {
+            Bukkit.getGlobalRegionScheduler().run(plugin, (task) -> {
                 player.closeInventory();
                 cleanInventory(plugin, player);
             });
@@ -295,7 +295,7 @@ public class Menu {
             return;
         }
 
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        Bukkit.getAsyncScheduler().runNow(plugin, (asyncTask) -> {
 
             Set<MenuItem> activeItems = new HashSet<>();
 
@@ -307,10 +307,10 @@ public class Menu {
 
                     if (slot >= this.options.size()) {
                         plugin.debug(
-                                DebugLevel.HIGHEST,
-                                Level.WARNING,
-                                "Item set to slot " + slot + " for menu: " + this.options.name() + " exceeds the inventory size!",
-                                "This item will not be added to the menu!"
+                            DebugLevel.HIGHEST,
+                            Level.WARNING,
+                            "Item set to slot " + slot + " for menu: " + this.options.name() + " exceeds the inventory size!",
+                            "This item will not be added to the menu!"
                         );
                         continue;
                     }
@@ -318,12 +318,10 @@ public class Menu {
                     if (item.options().viewRequirements().isPresent()) {
 
                         if (item.options().viewRequirements().get().evaluate(holder)) {
-
                             activeItems.add(item);
                             break;
                         }
                     } else {
-
                         activeItems.add(item);
                         break;
                     }
@@ -366,9 +364,7 @@ public class Menu {
 
                 ItemStack iStack = item.getItemStack(holder);
 
-                if (iStack == null) {
-                    continue;
-                }
+                if (iStack == null) continue;
 
                 iStack = plugin.getMenuItemMarker().mark(iStack);
 
@@ -376,10 +372,10 @@ public class Menu {
 
                 if (slot >= this.options.size()) {
                     plugin.debug(
-                            DebugLevel.HIGHEST,
-                            Level.WARNING,
-                            "Item set to slot " + slot + " for menu: " + this.options.name() + " exceeds the inventory size!",
-                            "This item will not be added to the menu!"
+                        DebugLevel.HIGHEST,
+                        Level.WARNING,
+                        "Item set to slot " + slot + " for menu: " + this.options.name() + " exceeds the inventory size!",
+                        "This item will not be added to the menu!"
                     );
                     continue;
                 }
@@ -393,8 +389,8 @@ public class Menu {
 
             final boolean updatePlaceholders = update;
 
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                if(options.refresh()) {
+            Bukkit.getGlobalRegionScheduler().run(plugin, (syncTask) -> {
+                if (options.refresh()) {
                     holder.startRefreshTask();
                 }
 
@@ -405,16 +401,17 @@ public class Menu {
                 viewer.openInventory(inventory);
                 menuHolders.add(holder);
 
-        if (updatePlaceholders) {
-          holder.startUpdatePlaceholdersTask();
-        }
-      });
+                if (updatePlaceholders) {
+                    holder.startUpdatePlaceholdersTask();
+                }
+            });
 
-      Bukkit.getScheduler().runTask(plugin, () -> {
-        DeluxeMenusOpenMenuEvent openEvent = new DeluxeMenusOpenMenuEvent(viewer, holder);
-        Bukkit.getPluginManager().callEvent(openEvent);
-      });
-    });
+
+            Bukkit.getGlobalRegionScheduler().run(plugin, (eventTask) -> {
+                DeluxeMenusOpenMenuEvent openEvent = new DeluxeMenusOpenMenuEvent(viewer, holder);
+                Bukkit.getPluginManager().callEvent(openEvent);
+            });
+        });
   }
 
     public void refreshForAll() {

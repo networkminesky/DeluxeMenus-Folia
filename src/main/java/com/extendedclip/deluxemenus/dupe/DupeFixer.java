@@ -3,11 +3,14 @@ package com.extendedclip.deluxemenus.dupe;
 import com.extendedclip.deluxemenus.DeluxeMenus;
 import com.extendedclip.deluxemenus.listener.Listener;
 import com.extendedclip.deluxemenus.utils.DebugLevel;
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.logging.Level;
@@ -55,21 +58,20 @@ public class DupeFixer extends Listener {
 
     @EventHandler
     private void onLogin(@NotNull final PlayerJoinEvent event) {
-        plugin.getServer().getScheduler().runTaskLater(
-                plugin,
-                () -> {
-                    for (final ItemStack itemStack : event.getPlayer().getInventory().getContents()) {
-                        if (itemStack == null) continue;
-                        if (!marker.isMarked(itemStack)) continue;
+        final Player player = event.getPlayer();
 
-                        plugin.debug(
-                                DebugLevel.LOWEST,
-                                Level.INFO,
-                                "Player logged in with a DeluxeMenus item in their inventory. Removing it."
-                        );
-                        event.getPlayer().getInventory().remove(itemStack);
-                    }},
-                10L
-        );
+        player.getScheduler().runDelayed(plugin, (task) -> {
+            for (final ItemStack itemStack : player.getInventory().getContents()) {
+                if (itemStack == null) continue;
+                if (!marker.isMarked(itemStack)) continue;
+
+                plugin.debug(
+                    DebugLevel.LOWEST,
+                    Level.INFO,
+                    "Player logged in with a DeluxeMenus item in their inventory. Removing it."
+                );
+                player.getInventory().remove(itemStack);
+            }
+        }, null, 10L);
     }
 }

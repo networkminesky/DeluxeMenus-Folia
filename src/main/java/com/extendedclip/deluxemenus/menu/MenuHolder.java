@@ -9,9 +9,8 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.NotNull;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask; // Import necessário
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -29,8 +28,8 @@ public class MenuHolder implements InventoryHolder {
     private Player placeholderPlayer;
     private String menuName;
     private Set<MenuItem> activeItems;
-    private BukkitTask updateTask = null;
-    private BukkitTask refreshTask = null;
+    private ScheduledTask updateTask = null;      // Alterado
+    private ScheduledTask refreshTask = null;     // Alterado
     private Inventory inventory;
     private boolean updating;
     private boolean parsePlaceholdersInArguments;
@@ -55,7 +54,7 @@ public class MenuHolder implements InventoryHolder {
         return viewer.getName();
     }
 
-    public BukkitTask getUpdateTask() {
+    public ScheduledTask getUpdateTask() {          // Alterado
         return updateTask;
     }
 
@@ -108,37 +107,29 @@ public class MenuHolder implements InventoryHolder {
         if (player == null) {
             return string;
         }
-
         return StringUtils.replacePlaceholders(string, player);
     }
 
     public @NotNull String setArguments(final @NotNull String string) {
         final Player player = this.placeholderPlayer != null ? this.placeholderPlayer : this.getViewer();
-
         return StringUtils.replaceArguments(
-                string,
-                this.typedArgs,
-                player,
-                this.parsePlaceholdersInArguments
+            string,
+            this.typedArgs,
+            player,
+            this.parsePlaceholdersInArguments
         );
     }
 
     public void refreshMenu() {
-
         Optional<Menu> optionalMenu = getMenu();
-        if (optionalMenu.isEmpty()) {
-            return;
-        }
+        if (optionalMenu.isEmpty()) return;
 
         Menu menu = optionalMenu.get();
-
-        if (menu.getMenuItems().isEmpty()) {
-            return;
-        }
+        if (menu.getMenuItems().isEmpty()) return;
 
         setUpdating(true);
 
-        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+        Bukkit.getAsyncScheduler().runNow(plugin, (task) -> {
 
             final Set<MenuItem> active = new HashSet<>();
 
@@ -152,9 +143,7 @@ public class MenuHolder implements InventoryHolder {
 
                 boolean m = false;
                 for (MenuItem item : e.values()) {
-
                     if (item.options().viewRequirements().isPresent()) {
-
                         if (item.options().viewRequirements().get().evaluate(this)) {
                             m = true;
                             active.add(item);
@@ -174,40 +163,33 @@ public class MenuHolder implements InventoryHolder {
 
             if (active.isEmpty()) {
                 Menu.closeMenu(plugin, getViewer(), true);
+                return;
             }
 
-            Bukkit.getScheduler().runTask(plugin, () -> {
-
+            Bukkit.getGlobalRegionScheduler().run(plugin, (syncTask) -> {
                 boolean update = false;
 
                 for (MenuItem item : active) {
-
                     ItemStack iStack = item.getItemStack(this);
-
-                    if (iStack == null) {
-                        continue;
-                    }
+                    if (iStack == null) continue;
 
                     iStack = plugin.getMenuItemMarker().mark(iStack);
 
                     int slot = item.options().slot();
-
-                    if (slot >= menu.options().size()) {
-                        continue;
-                    }
+                    if (slot >= menu.options().size()) continue;
 
                     if (item.options().updatePlaceholders()) {
                         update = true;
                     }
 
-                    getInventory().setItem(item.options().slot(), iStack);
+                    getInventory().setItem(slot, iStack);
                 }
 
                 setActiveItems(active);
 
                 if (update && updateTask == null) {
                     startUpdatePlaceholdersTask();
-                } else if(!update && updateTask != null) {
+                } else if (!update && updateTask != null) {
                     stopPlaceholderUpdate();
                 }
 
@@ -220,108 +202,83 @@ public class MenuHolder implements InventoryHolder {
         if (updateTask != null) {
             try {
                 updateTask.cancel();
-            } catch (Exception ignored) {
-            }
+            } catch (Exception ignored) {}
             updateTask = null;
         }
     }
 
     public void stopRefreshTask() {
-        if(refreshTask != null) {
+        if (refreshTask != null) {
             try {
                 refreshTask.cancel();
-            } catch (Exception ignored) {
-            }
+            } catch (Exception ignored) {}
             refreshTask = null;
         }
     }
 
     public void startRefreshTask() {
-        if(refreshTask != null) {
+        if (refreshTask != null) {
             stopRefreshTask();
         }
 
-        refreshTask = new BukkitRunnable() {
-            @Override
-            public void run() {
-                refreshMenu();
-            }
-        }.runTaskTimerAsynchronously(plugin, 20L,
-                20L * Menu.getMenuByName(menuName)
-                        .map(Menu::options)
-                        .map(MenuOptions::refreshInterval)
-                        .orElse(10));
+        refreshTask = Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, (task) -> {
+            refreshMenu();
+        }, 20L, 20L * Menu.getMenuByName(menuName)
+            .map(Menu::options)
+            .map(MenuOptions::refreshInterval)
+            .orElse(10));
     }
 
     public void startUpdatePlaceholdersTask() {
-
         if (updateTask != null) {
             stopPlaceholderUpdate();
         }
 
-        updateTask = new BukkitRunnable() {
+        updateTask = Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, (task) -> {
 
-            @Override
-            public void run() {
+            if (updating) return;
 
-                if (updating) {
-                    return;
-                }
+            Set<MenuItem> items = getActiveItems();
+            if (items == null) return;
 
-                Set<MenuItem> items = getActiveItems();
+            for (MenuItem item : items) {
+                if (!item.options().updatePlaceholders()) continue;
 
-                if (items == null) {
-                    return;
-                }
+                ItemStack i = inventory.getItem(item.options().slot());
+                if (i == null) continue;
 
-                for (MenuItem item : items) {
+                int amt = i.getAmount();
 
-                    if (item.options().updatePlaceholders()) {
-
-                        ItemStack i = inventory.getItem(item.options().slot());
-
-                        if (i == null) {
-                            continue;
-                        }
-
-                        int amt = i.getAmount();
-
-                        if (item.options().dynamicAmount().isPresent()) {
-                            try {
-                                amt = Integer.parseInt(setPlaceholdersAndArguments(item.options().dynamicAmount().get()));
-                                if (amt <= 0) {
-                                    amt = 1;
-                                }
-                            } catch (Exception exception) {
-                                plugin.printStacktrace(
-                                        "Something went wrong while updating item in slot " + item.options().slot() +
-                                                ". Invalid dynamic amount: " + setPlaceholdersAndArguments(item.options().dynamicAmount().get()),
-                                        exception
-                                );
-                            }
-                        }
-
-                        ItemMeta meta = i.getItemMeta();
-
-                        if (item.options().displayNameHasPlaceholders() && item.options().displayName().isPresent()) {
-                            meta.setDisplayName(StringUtils.color(setPlaceholdersAndArguments(item.options().displayName().get())));
-                        }
-
-                        if (item.options().loreHasPlaceholders()) {
-                            meta.setLore(item.getMenuItemLore(getHolder(), item.options().lore()));
-                        }
-
-                        i.setItemMeta(meta);
-                        i.setAmount(amt);
+                if (item.options().dynamicAmount().isPresent()) {
+                    try {
+                        amt = Integer.parseInt(setPlaceholdersAndArguments(item.options().dynamicAmount().get()));
+                        if (amt <= 0) amt = 1;
+                    } catch (Exception exception) {
+                        plugin.printStacktrace(
+                            "Something went wrong while updating item in slot " + item.options().slot() +
+                                ". Invalid dynamic amount: " + setPlaceholdersAndArguments(item.options().dynamicAmount().get()),
+                            exception
+                        );
                     }
                 }
-            }
 
-        }.runTaskTimerAsynchronously(plugin, 20L,
-                20L * Menu.getMenuByName(menuName)
-                        .map(Menu::options)
-                        .map(MenuOptions::updateInterval)
-                        .orElse(10));
+                ItemMeta meta = i.getItemMeta();
+
+                if (item.options().displayNameHasPlaceholders() && item.options().displayName().isPresent()) {
+                    meta.setDisplayName(StringUtils.color(setPlaceholdersAndArguments(item.options().displayName().get())));
+                }
+
+                if (item.options().loreHasPlaceholders()) {
+                    meta.setLore(item.getMenuItemLore(getHolder(), item.options().lore()));
+                }
+
+                i.setItemMeta(meta);
+                i.setAmount(amt);
+            }
+        }, 20L, 20L * Menu.getMenuByName(menuName)
+            .map(Menu::options)
+            .map(MenuOptions::updateInterval)
+            .orElse(10));
     }
 
     public boolean isUpdating() {
