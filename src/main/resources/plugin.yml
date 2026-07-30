@@ -1,7 +1,7 @@
-api-version: 1.13
+api-version: 26.1
 name: DeluxeMenus
 main: com.extendedclip.deluxemenus.DeluxeMenus
-version: ${version}
+version: 1.14.2
 authors: [ HelpChat ]
 softdepend: [ PlaceholderAPI, Vault, HeadDatabase, CraftEngine, ItemsAdder, Nexo, Oraxen, ExecutableItems, ExecutableBlocks, Score, SimpleItemGenerator, MMOItems ]
 description: All in one inventory menu system

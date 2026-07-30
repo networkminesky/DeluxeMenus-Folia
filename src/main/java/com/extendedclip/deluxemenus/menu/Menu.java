@@ -200,10 +200,10 @@ public class Menu {
         }
 
         if (close) {
-            Bukkit.getGlobalRegionScheduler().run(plugin, (task) -> {
+            player.getScheduler().run(plugin, task -> {
                 player.closeInventory();
                 cleanInventory(plugin, player);
-            });
+            }, null);
         }
         menuHolders.remove(holder);
         lastOpenedMenus.put(player.getUniqueId(), holder.getMenu().orElse(null));
@@ -389,7 +389,7 @@ public class Menu {
 
             final boolean updatePlaceholders = update;
 
-            Bukkit.getGlobalRegionScheduler().run(plugin, (syncTask) -> {
+            viewer.getScheduler().run(plugin, task -> {
                 if (options.refresh()) {
                     holder.startRefreshTask();
                 }
@@ -404,13 +404,13 @@ public class Menu {
                 if (updatePlaceholders) {
                     holder.startUpdatePlaceholdersTask();
                 }
-            });
+            }, null);
 
 
-            Bukkit.getGlobalRegionScheduler().run(plugin, (eventTask) -> {
+            viewer.getScheduler().run(plugin, task -> {
                 DeluxeMenusOpenMenuEvent openEvent = new DeluxeMenusOpenMenuEvent(viewer, holder);
                 Bukkit.getPluginManager().callEvent(openEvent);
-            });
+            }, null);
         });
   }
 

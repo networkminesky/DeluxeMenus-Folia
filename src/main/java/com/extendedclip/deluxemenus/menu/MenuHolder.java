@@ -3,6 +3,7 @@ package com.extendedclip.deluxemenus.menu;
 import com.extendedclip.deluxemenus.DeluxeMenus;
 import com.extendedclip.deluxemenus.menu.options.MenuOptions;
 import com.extendedclip.deluxemenus.utils.StringUtils;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
@@ -10,15 +11,8 @@ import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.jetbrains.annotations.NotNull;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask; // Import necessário
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.TreeMap;
+import java.util.*;
 
 public class MenuHolder implements InventoryHolder {
 
@@ -28,8 +22,8 @@ public class MenuHolder implements InventoryHolder {
     private Player placeholderPlayer;
     private String menuName;
     private Set<MenuItem> activeItems;
-    private ScheduledTask updateTask = null;      // Alterado
-    private ScheduledTask refreshTask = null;     // Alterado
+    private ScheduledTask updateTask = null;
+    private ScheduledTask refreshTask = null;
     private Inventory inventory;
     private boolean updating;
     private boolean parsePlaceholdersInArguments;
@@ -54,7 +48,7 @@ public class MenuHolder implements InventoryHolder {
         return viewer.getName();
     }
 
-    public ScheduledTask getUpdateTask() {          // Alterado
+    public ScheduledTask getUpdateTask() {
         return updateTask;
     }
 
@@ -129,7 +123,7 @@ public class MenuHolder implements InventoryHolder {
 
         setUpdating(true);
 
-        Bukkit.getAsyncScheduler().runNow(plugin, (task) -> {
+        viewer.getScheduler().run(plugin, task -> {
 
             final Set<MenuItem> active = new HashSet<>();
 
@@ -166,36 +160,34 @@ public class MenuHolder implements InventoryHolder {
                 return;
             }
 
-            Bukkit.getGlobalRegionScheduler().run(plugin, (syncTask) -> {
-                boolean update = false;
+            boolean update = false;
 
-                for (MenuItem item : active) {
-                    ItemStack iStack = item.getItemStack(this);
-                    if (iStack == null) continue;
+            for (MenuItem item : active) {
+                ItemStack iStack = item.getItemStack(this);
+                if (iStack == null) continue;
 
-                    iStack = plugin.getMenuItemMarker().mark(iStack);
+                iStack = plugin.getMenuItemMarker().mark(iStack);
 
-                    int slot = item.options().slot();
-                    if (slot >= menu.options().size()) continue;
+                int slot = item.options().slot();
+                if (slot >= menu.options().size()) continue;
 
-                    if (item.options().updatePlaceholders()) {
-                        update = true;
-                    }
-
-                    getInventory().setItem(slot, iStack);
+                if (item.options().updatePlaceholders()) {
+                    update = true;
                 }
 
-                setActiveItems(active);
+                getInventory().setItem(slot, iStack);
+            }
 
-                if (update && updateTask == null) {
-                    startUpdatePlaceholdersTask();
-                } else if (!update && updateTask != null) {
-                    stopPlaceholderUpdate();
-                }
+            setActiveItems(active);
 
-                setUpdating(false);
-            });
-        });
+            if (update && updateTask == null) {
+                startUpdatePlaceholdersTask();
+            } else if (!update && updateTask != null) {
+                stopPlaceholderUpdate();
+            }
+
+            setUpdating(false);
+        }, null);
     }
 
     public void stopPlaceholderUpdate() {
@@ -221,9 +213,9 @@ public class MenuHolder implements InventoryHolder {
             stopRefreshTask();
         }
 
-        refreshTask = Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, (task) -> {
+        refreshTask = viewer.getScheduler().runAtFixedRate(plugin, task -> {
             refreshMenu();
-        }, 20L, 20L * Menu.getMenuByName(menuName)
+        }, null, 20L, 20L * Menu.getMenuByName(menuName)
             .map(Menu::options)
             .map(MenuOptions::refreshInterval)
             .orElse(10));
@@ -234,7 +226,7 @@ public class MenuHolder implements InventoryHolder {
             stopPlaceholderUpdate();
         }
 
-        updateTask = Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, (task) -> {
+        updateTask = viewer.getScheduler().runAtFixedRate(plugin, task -> {
 
             if (updating) return;
 
@@ -275,7 +267,7 @@ public class MenuHolder implements InventoryHolder {
                 i.setItemMeta(meta);
                 i.setAmount(amt);
             }
-        }, 20L, 20L * Menu.getMenuByName(menuName)
+        }, null, 20L, 20L * Menu.getMenuByName(menuName)
             .map(Menu::options)
             .map(MenuOptions::updateInterval)
             .orElse(10));

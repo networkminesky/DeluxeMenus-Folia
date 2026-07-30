@@ -25,15 +25,16 @@ public class ClickActionTask extends BukkitRunnable {
     private final Map<String, String> arguments;
     private final boolean parsePlaceholdersInArguments;
     private final boolean parsePlaceholdersAfterArguments;
+    private static Boolean isFoliaCached = null;
 
     public ClickActionTask(
-            @NotNull final DeluxeMenus plugin,
-            @NotNull final UUID uuid,
-            @NotNull final ActionType actionType,
-            @NotNull final String exec,
-            @NotNull final Map<String, String> arguments,
-            final boolean parsePlaceholdersInArguments,
-            final boolean parsePlaceholdersAfterArguments
+        @NotNull final DeluxeMenus plugin,
+        @NotNull final UUID uuid,
+        @NotNull final ActionType actionType,
+        @NotNull final String exec,
+        @NotNull final Map<String, String> arguments,
+        final boolean parsePlaceholdersInArguments,
+        final boolean parsePlaceholdersAfterArguments
     ) {
         this.plugin = plugin;
         this.uuid = uuid;
@@ -42,6 +43,18 @@ public class ClickActionTask extends BukkitRunnable {
         this.arguments = arguments;
         this.parsePlaceholdersInArguments = parsePlaceholdersInArguments;
         this.parsePlaceholdersAfterArguments = parsePlaceholdersAfterArguments;
+    }
+
+    private static boolean isFolia() {
+        if (isFoliaCached == null) {
+            try {
+                Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
+                isFoliaCached = true;
+            } catch (ClassNotFoundException e) {
+                isFoliaCached = false;
+            }
+        }
+        return isFoliaCached;
     }
 
     @Override
@@ -53,16 +66,16 @@ public class ClickActionTask extends BukkitRunnable {
 
         final Optional<MenuHolder> holder = Menu.getMenuHolder(player);
         final Player target = holder.isPresent() && holder.get().getPlaceholderPlayer() != null
-                ? holder.get().getPlaceholderPlayer()
-                : player;
+            ? holder.get().getPlaceholderPlayer()
+            : player;
 
 
         final String executable = StringUtils.replacePlaceholdersAndArguments(
-                this.exec,
-                this.arguments,
-                target,
-                this.parsePlaceholdersInArguments,
-                this.parsePlaceholdersAfterArguments);
+            this.exec,
+            this.arguments,
+            target,
+            this.parsePlaceholdersInArguments,
+            this.parsePlaceholdersAfterArguments);
 
         switch (actionType) {
             case META:
@@ -105,7 +118,13 @@ public class ClickActionTask extends BukkitRunnable {
                 break;
 
             case CONSOLE:
-                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), executable);
+                if (isFolia()) {
+                    Bukkit.getGlobalRegionScheduler().run(plugin, task -> {
+                        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), executable);
+                    });
+                } else {
+                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), executable);
+                }
                 break;
 
             case MINI_MESSAGE:
@@ -187,9 +206,9 @@ public class ClickActionTask extends BukkitRunnable {
                 if (menuArgumentNames.isEmpty()) {
                     if (passedArgumentValues != null && passedArgumentValues.length > 0) {
                         plugin.debug(
-                                DebugLevel.HIGHEST,
-                                Level.WARNING,
-                                "Arguments were given for menu " + menuName + " in action [openguimenu] or [openmenu], but the menu does not support arguments!"
+                            DebugLevel.HIGHEST,
+                            Level.WARNING,
+                            "Arguments were given for menu " + menuName + " in action [openguimenu] or [openmenu], but the menu does not support arguments!"
                         );
                     }
 
@@ -215,9 +234,9 @@ public class ClickActionTask extends BukkitRunnable {
 
                 if (passedArgumentValues.length < menuArgumentNames.size()) {
                     plugin.debug(
-                            DebugLevel.HIGHEST,
-                            Level.WARNING,
-                            "Not enough arguments given for menu " + menuName + " when opening using the [openguimenu] or [openmenu] action!"
+                        DebugLevel.HIGHEST,
+                        Level.WARNING,
+                        "Not enough arguments given for menu " + menuName + " when opening using the [openguimenu] or [openmenu] action!"
                     );
                     break;
                 }
@@ -235,9 +254,9 @@ public class ClickActionTask extends BukkitRunnable {
                     if (passedArgumentValues.length <= index) {
                         // This should never be the case!
                         plugin.debug(
-                                DebugLevel.HIGHEST,
-                                Level.WARNING,
-                                "Not enough arguments given for menu " + menuName + " when opening using the [openguimenu] or [openmenu] action!"
+                            DebugLevel.HIGHEST,
+                            Level.WARNING,
+                            "Not enough arguments given for menu " + menuName + " when opening using the [openguimenu] or [openmenu] action!"
                         );
                         break;
                     }
@@ -276,9 +295,9 @@ public class ClickActionTask extends BukkitRunnable {
             case REFRESH:
                 if (holder.isEmpty()) {
                     plugin.debug(
-                            DebugLevel.MEDIUM,
-                            Level.WARNING,
-                            player.getName() + " does not have menu open! Nothing to refresh!"
+                        DebugLevel.MEDIUM,
+                        Level.WARNING,
+                        player.getName() + " does not have menu open! Nothing to refresh!"
                     );
                     break;
                 }
@@ -296,9 +315,9 @@ public class ClickActionTask extends BukkitRunnable {
                     plugin.getVault().takeMoney(player, Double.parseDouble(executable));
                 } catch (final NumberFormatException exception) {
                     plugin.debug(
-                            DebugLevel.HIGHEST,
-                            Level.WARNING,
-                            "Amount for take money action: " + executable + ", is not a valid number!"
+                        DebugLevel.HIGHEST,
+                        Level.WARNING,
+                        "Amount for take money action: " + executable + ", is not a valid number!"
                     );
                 }
                 break;
@@ -313,9 +332,9 @@ public class ClickActionTask extends BukkitRunnable {
                     plugin.getVault().giveMoney(player, Double.parseDouble(executable));
                 } catch (final NumberFormatException exception) {
                     plugin.debug(
-                            DebugLevel.HIGHEST,
-                            Level.WARNING,
-                            "Amount for give money action: " + executable + ", is not a valid number!"
+                        DebugLevel.HIGHEST,
+                        Level.WARNING,
+                        "Amount for give money action: " + executable + ", is not a valid number!"
                     );
                 }
                 break;
@@ -338,17 +357,17 @@ public class ClickActionTask extends BukkitRunnable {
                 } catch (final NumberFormatException exception) {
                     if (actionType == ActionType.TAKE_EXP) {
                         plugin.debug(
-                                DebugLevel.HIGHEST,
-                                Level.WARNING,
-                                "Amount for take exp action: " + executable + ", is not a valid number!"
+                            DebugLevel.HIGHEST,
+                            Level.WARNING,
+                            "Amount for take exp action: " + executable + ", is not a valid number!"
                         );
                         break;
                     }
 
                     plugin.debug(
-                            DebugLevel.HIGHEST,
-                            Level.WARNING,
-                            "Amount for give exp action: " + executable + ", is not a valid number!"
+                        DebugLevel.HIGHEST,
+                        Level.WARNING,
+                        "Amount for give exp action: " + executable + ", is not a valid number!"
                     );
                     break;
                 }
@@ -356,9 +375,9 @@ public class ClickActionTask extends BukkitRunnable {
             case GIVE_PERM:
                 if (plugin.getVault() == null || !plugin.getVault().hooked()) {
                     plugin.debug(
-                            DebugLevel.HIGHEST,
-                            Level.WARNING,
-                            "Vault not hooked! Cannot give permission: " + executable + "!");
+                        DebugLevel.HIGHEST,
+                        Level.WARNING,
+                        "Vault not hooked! Cannot give permission: " + executable + "!");
                     break;
                 }
 
@@ -368,9 +387,9 @@ public class ClickActionTask extends BukkitRunnable {
             case TAKE_PERM:
                 if (plugin.getVault() == null || !plugin.getVault().hooked()) {
                     plugin.debug(
-                            DebugLevel.HIGHEST,
-                            Level.WARNING,
-                            "Vault not hooked! Cannot take permission: " + executable + "!");
+                        DebugLevel.HIGHEST,
+                        Level.WARNING,
+                        "Vault not hooked! Cannot take permission: " + executable + "!");
                     break;
                 }
 
@@ -396,8 +415,8 @@ public class ClickActionTask extends BukkitRunnable {
                             sound = SoundUtils.getSound(executable.toUpperCase());
                         } catch (final IllegalArgumentException exception) {
                             plugin.printStacktrace(
-                                    "Sound name given for sound action: " + executable + ", is not a valid sound!",
-                                    exception
+                                "Sound name given for sound action: " + executable + ", is not a valid sound!",
+                                exception
                             );
                             break;
                         }
@@ -411,8 +430,8 @@ public class ClickActionTask extends BukkitRunnable {
                             sound = SoundUtils.getSound(parts[0].toUpperCase());
                         } catch (final IllegalArgumentException exception) {
                             plugin.printStacktrace(
-                                    "Sound name given for sound action: " + parts[0] + ", is not a valid sound!",
-                                    exception
+                                "Sound name given for sound action: " + parts[0] + ", is not a valid sound!",
+                                exception
                             );
                             break;
                         }
@@ -423,14 +442,14 @@ public class ClickActionTask extends BukkitRunnable {
                             pitch = Float.parseFloat(parts[2]);
                         } catch (final NumberFormatException exception) {
                             plugin.debug(
-                                    DebugLevel.HIGHEST,
-                                    Level.WARNING,
-                                    "Pitch given for sound action: " + parts[2] + ", is not a valid number!"
+                                DebugLevel.HIGHEST,
+                                Level.WARNING,
+                                "Pitch given for sound action: " + parts[2] + ", is not a valid number!"
                             );
 
                             plugin.printStacktrace(
-                                    "Pitch given for sound action: " + parts[2] + ", is not a valid number!",
-                                    exception
+                                "Pitch given for sound action: " + parts[2] + ", is not a valid number!",
+                                exception
                             );
                         }
                     }
@@ -440,14 +459,14 @@ public class ClickActionTask extends BukkitRunnable {
                         volume = Float.parseFloat(parts[1]);
                     } catch (final NumberFormatException exception) {
                         plugin.debug(
-                                DebugLevel.HIGHEST,
-                                Level.WARNING,
-                                "Volume given for sound action: " + parts[1] + ", is not a valid number!"
+                            DebugLevel.HIGHEST,
+                            Level.WARNING,
+                            "Volume given for sound action: " + parts[1] + ", is not a valid number!"
                         );
 
                         plugin.printStacktrace(
-                                "Volume given for sound action: " + parts[1] + ", is not a valid number!",
-                                exception
+                            "Volume given for sound action: " + parts[1] + ", is not a valid number!",
+                            exception
                         );
                     }
                 }
@@ -472,9 +491,9 @@ public class ClickActionTask extends BukkitRunnable {
                     case BROADCAST_SOUND:
                         if (sound == null) {
                             plugin.debug(
-                                    DebugLevel.HIGHEST,
-                                    Level.WARNING,
-                                    "Sound name given for sound action: " + executable + ", is not a valid sound!"
+                                DebugLevel.HIGHEST,
+                                Level.WARNING,
+                                "Sound name given for sound action: " + executable + ", is not a valid sound!"
                             );
                             break;
                         }
@@ -486,9 +505,9 @@ public class ClickActionTask extends BukkitRunnable {
                     case BROADCAST_WORLD_SOUND:
                         if (sound == null) {
                             plugin.debug(
-                                    DebugLevel.HIGHEST,
-                                    Level.WARNING,
-                                    "Sound name given for sound action: " + executable + ", is not a valid sound!"
+                                DebugLevel.HIGHEST,
+                                Level.WARNING,
+                                "Sound name given for sound action: " + executable + ", is not a valid sound!"
                             );
                             break;
                         }
@@ -500,9 +519,9 @@ public class ClickActionTask extends BukkitRunnable {
                     case PLAY_SOUND:
                         if (sound == null) {
                             plugin.debug(
-                                    DebugLevel.HIGHEST,
-                                    Level.WARNING,
-                                    "Sound name given for sound action: " + executable + ", is not a valid sound!"
+                                DebugLevel.HIGHEST,
+                                Level.WARNING,
+                                "Sound name given for sound action: " + executable + ", is not a valid sound!"
                             );
                             break;
                         }
